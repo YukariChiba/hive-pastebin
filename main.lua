@@ -26,22 +26,17 @@ end
 
 local function get(req)
     if req.params.uuid then
-        local flag, file = pcall(fs.open, req.params.uuid .. ".txt")
-        if flag then
+        local file, err = fs.open(req.params.uuid .. ".txt")
+        if not err then
             filedata = file:read('a')
             meta_readable, expire_counts = pcall(decrease_meta_count, req)
-            if not meta_readable then
-                expire_counts = -1
-            end
-            return {
-                content = filedata,
-                expire_counts = expire_counts
-            }
+            if not meta_readable then expire_counts = -1 end
+            return {content = filedata, expire_counts = expire_counts}
         else
-            error(hive.Error {status = 404, error = "Not found"}())
+            error({status = 404, error = err})
         end
     else
-        error(hive.Error {status = 400, error = "No uuid"}())
+        error({status = 400, error = "No uuid"})
     end
 end
 
@@ -58,22 +53,12 @@ local function post(req)
             file_meta:write(json.stringify({expire_counts = expire_counts}))
             return {uuid = id}
         else
-            error(hive.Error {status = 400, error = "Blank content"}())
+            error({status = 400, error = "Blank content"})
         end
     else
-        error(hive.Error {status = 400, error = "Blank content"}())
+        error({status = 400, error = "Blank content"})
     end
 end
 
-local function main(req)
-    if req.method == 'POST' then
-        return post(req)
-    elseif req.method == 'GET' then
-        return get(req)
-    else
-        error(hive.Error {status = 405, error = "Invalid method"}())
-    end
-end
-
-hive.register("/:uuid", main)
-hive.register("/", main)
+hive.register("/:uuid", routing.post(post):get(get))
+hive.register("/", routing.post(post))
